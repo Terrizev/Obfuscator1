@@ -248,9 +248,38 @@
         <p>All processing happens in your browser - no code is sent to any server.</p>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/js-confuser@latest/dist/js-confuser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-confuser@2.10.0/dist/js-confuser.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        // Wait for JsConfuser to be fully loaded
+        function waitForJsConfuser() {
+            return new Promise((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (typeof JsConfuser !== 'undefined') {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    reject(new Error('JsConfuser failed to load'));
+                }, 5000);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                await waitForJsConfuser();
+                initApp();
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('status').textContent = '❌ Failed to load obfuscation engine. Please refresh the page.';
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').style.display = 'block';
+            }
+        });
+
+        function initApp() {
             const inputCode = document.getElementById('input-code');
             const outputCode = document.getElementById('output-code');
             const obfuscateBtn = document.getElementById('obfuscate-btn');
@@ -388,7 +417,7 @@
                 status.className = 'status ' + type;
                 status.style.display = 'block';
             }
-        });
+        }
     </script>
 </body>
-  </html>
+</html>
