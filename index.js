@@ -1,5 +1,6 @@
 import express from 'express';
-import { JsConfuser } from 'js-confuser';
+import pkg from 'js-confuser';
+const { JsConfuser } = pkg;
 import multer from 'multer';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
