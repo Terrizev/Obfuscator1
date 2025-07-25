@@ -1,169 +1,74 @@
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { body, validationResult } from 'express-validator';
+import { JsConfuser } from 'js-confuser';
 import multer from 'multer';
-import sanitizeFilename from 'sanitize-filename';
-import JsConfuser from 'js-confuser';
-import fs from 'fs/promises';
-import csrf from 'csurf';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
+import csrf from 'csurf';
 
-// Config
 dotenv.config();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = process.env.PORT || 3000;
+const csrfProtection = csrf({ cookie: true });
 
-// Security Middleware
-app.use(helmet());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(csrf({ cookie: true }));
-
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.'
-});
-app.use(limiter);
-
-// View Engine
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-// Static Files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// File Upload Config
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
-    await fs.mkdir(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const sanitized = sanitizeFilename(file.originalname);
-    cb(null, `${Date.now()}-${sanitized}`);
+// S3 Configuration
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_KEY
   }
 });
 
+// File Upload Setup
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
-    const validTypes = ['application/javascript', 'text/javascript'];
-    if (validTypes.includes(file.mimetype) {
+    if (file.mimetype === 'application/javascript') {
       cb(null, true);
     } else {
-      cb(new Error('Only JavaScript files (.js) are allowed!'), false);
+      cb(new Error('Only JavaScript files allowed'), false);
     }
+  }
+});
+
+// Obfuscation Config (v2 Compatible)
+const getObfuscationConfig = (level) => ({
+  target: 'browser',
+  preset: level === 'high' ? 'high' : level === 'medium' ? 'medium' : 'low',
+  identifierGenerator: () => {
+    const base = "素TERRI晴DEV晴".replace(/[^a-zA-Z素TERRI晴DEV晴]/g, "");
+    return base + Math.random().toString(36).slice(2, 4);
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  // Additional v2-specific options
+  deadCode: level === 'high' ? 0.3 : 0,
+  stringSplitting: level !== 'low',
+  shuffle: level === 'high'
 });
 
 // Routes
-app.get('/', (req, res) => {
-  res.render('index', { 
-    title: 'Code Obfuscator Pro',
-    csrfToken: req.csrfToken(),
-    message: null
-  });
-});
+app.post('/upload', upload.single('jsfile'), csrfProtection, async (req, res) => {
+  try {
+    const obfuscated = await JsConfuser.obfuscate(
+      req.file.buffer.toString('utf8'),
+      getObfuscationConfig(req.body.level)
+    );
 
-app.post('/upload', 
-  upload.single('jsfile'),
-  [
-    body('obfuscationLevel').isIn(['low', 'medium', 'high']),
-    body('csrfToken').notEmpty()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).render('index', { 
-        title: 'Error',
-        csrfToken: req.csrfToken(),
-        message: errors.array()[0].msg 
-      });
-    }
+    // Upload to S3
+    const s3Key = `obfuscated-${Date.now()}.js`;
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.AWS_BUCKET,
+      Key: s3Key,
+      Body: obfuscated,
+      ContentType: 'application/javascript'
+    }));
 
-    try {
-      const fileContent = await fs.readFile(req.file.path, 'utf8');
-      const obfuscatedCode = await JsConfuser.obfuscate(
-        fileContent, 
-        getObfuscationConfig(req.body.obfuscationLevel)
-      );
-
-      const outputFilename = `obfuscated-${req.file.filename}`;
-      const outputPath = path.join(__dirname, 'public', 'downloads', outputFilename);
-      
-      await fs.writeFile(outputPath, obfuscatedCode);
-      await fs.unlink(req.file.path); // Cleanup
-
-      res.render('result', {
-        title: 'Obfuscation Complete',
-        downloadLink: `/downloads/${outputFilename}`,
-        originalFilename: req.file.originalname,
-        csrfToken: req.csrfToken()
-      });
-
-    } catch (error) {
-      console.error('Error:', error);
-      res.status(500).render('index', {
-        title: 'Error',
-        csrfToken: req.csrfToken(),
-        message: 'Obfuscation failed. Please try again.'
-      });
-    }
+    res.json({
+      downloadUrl: `https://${process.env.AWS_BUCKET}.s3.amazonaws.com/${s3Key}`
+    });
+  } catch (error) {
+    console.error('Obfuscation error:', error);
+    res.status(500).send('Obfuscation failed');
   }
-);
-
-// Obfuscation Config (Your Custom Settings)
-function getObfuscationConfig(level) {
-  const baseConfig = {
-    target: "node",
-    compact: true,
-    minify: true,
-    renameVariables: true,
-    renameGlobals: true,
-    stringEncoding: true,
-    stringConcealing: true,
-    stringCompression: true,
-    duplicateLiteralsRemoval: 1.0,
-    hexadecimalNumbers: true,
-    identifierGenerator: () => {
-      const originalString = "素TERRI晴DEV晴" + "素TERRI晴DEV晴";
-      const cleanString = originalString.replace(/[^a-zA-Z素TERRI晴DEV晴]/g, "");
-      const randomChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-      const randomSuffix = Array.from({length: 2}, () => 
-        randomChars.charAt(Math.floor(Math.random() * randomChars.length))).join('');
-      return cleanString + randomSuffix;
-    }
-  };
-
-  const levelConfigs = {
-    low: { controlFlowFlattening: 0.3, opaquePredicates: 0.2 },
-    medium: { controlFlowFlattening: 0.7, opaquePredicates: 0.5, flatten: true },
-    high: { 
-      controlFlowFlattening: 1.0,
-      opaquePredicates: 0.9,
-      flatten: true,
-      stack: true,
-      dispatcher: true,
-      calculator: true,
-      movedDeclarations: true,
-      objectExtraction: true,
-      globalConcealing: true
-    }
-  };
-
-  return { ...baseConfig, ...levelConfigs[level] };
-}
-
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
 });
+
+app.listen(process.env.PORT || 3000);
