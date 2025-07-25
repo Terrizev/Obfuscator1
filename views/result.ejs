@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+  <div class="min-h-screen container mx-auto px-4 py-12">
+    <div class="max-w-2xl mx-auto">
+      <!-- Success Card -->
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+        <div class="bg-gradient-to-r from-green-600 to-green-800 p-6 text-white">
+          <h2 class="text-2xl font-bold"><i class="fas fa-check-circle mr-2"></i> Obfuscation Complete!</h2>
+        </div>
+        
+        <div class="p-6">
+          <div class="flex items-start mb-6">
+            <div class="bg-green-100 p-3 rounded-full mr-4">
+              <i class="fas fa-file-code text-green-600 text-xl"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-lg"><%= originalFilename %></h3>
+              <p class="text-gray-600">Successfully protected</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <a href="<%= downloadLink %>" class="block text-center bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition duration-200">
+              <i class="fas fa-download mr-2"></i> Download Obfuscated File
+            </a>
+            
+            <a href="/" class="block text-center bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-medium transition duration-200">
+              <i class="fas fa-redo mr-2"></i> Obfuscate Another File
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Notice -->
+      <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+        <div class="flex">
+          <div class="flex-shrink-0 pt-1">
+            <i class="fas fa-exclamation-triangle text-yellow-400 text-xl"></i>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-lg font-medium text-yellow-800">Security Recommendations</h3>
+            <ul class="mt-2 text-yellow-700 space-y-1">
+              <li><i class="fas fa-check-circle mr-2"></i> Always test obfuscated code before deployment</li>
+              <li><i class="fas fa-check-circle mr-2"></i> Keep original source code backups</li>
+              <li><i class="fas fa-check-circle mr-2"></i> Combine with other security measures</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
