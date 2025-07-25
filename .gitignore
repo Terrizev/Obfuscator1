@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Uploads and downloads
+uploads/
+public/downloads/
+
+# Environment variables
+.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
